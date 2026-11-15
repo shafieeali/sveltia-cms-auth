@@ -339,14 +339,32 @@ const handleCallback = async (request, env) => {
   let result;
 
   try {
-    result = await response.json();
+    const body = await response.text();
+    try {
+      result = JSON.parse(body);
+    } catch {
+      // GitHub can use form-encoded OAuth replies as well as JSON.
+      // Accept the standard form response without logging credentials or tokens.
+      const contentType = response.headers.get('content-type') ?? '';
+      if (
+        contentType.includes('application/x-www-form-urlencoded') ||
+        /^(?:access_token|error)=/.test(body)
+      ) {
+        result = Object.fromEntries(new URLSearchParams(body));
+      }
+    }
   } catch {
-    //
+    // Leave the original malformed-response fallback in place.
   }
 
   const { access_token: token, refresh_token: refreshToken, error } = result ?? {};
 
   if (!token && !error) {
+    // Safe diagnostic metadata only; never log the OAuth code, body, or tokens.
+    console.warn('GitHub OAuth token response was not recognized', {
+      status: response.status,
+      contentType: response.headers.get('content-type') ?? 'unknown',
+    });
     return outputError('MALFORMED_RESPONSE', env);
   }
 
