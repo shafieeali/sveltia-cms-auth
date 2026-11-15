@@ -197,6 +197,7 @@ const errorMessages = {
   CSRF_DETECTED: 'Potential CSRF attack detected. Authentication flow aborted.',
   TOKEN_REQUEST_FAILED: 'Failed to request an access token. Please try again later.',
   MALFORMED_RESPONSE: 'Server responded with malformed data. Please try again later.',
+  RATE_LIMITED: 'GitHub is temporarily rate-limiting sign-in. Please wait before trying again.',
 };
 
 /**
@@ -333,6 +334,19 @@ const handleCallback = async (request, env) => {
 
   if (!response) {
     return outputError('TOKEN_REQUEST_FAILED', env);
+  }
+
+  if (response.status === 429) {
+    // Do not retry OAuth codes: they are single-use, and retries can worsen rate limits.
+    // Log only non-sensitive response metadata, never auth codes, credentials or body.
+    console.warn('GitHub OAuth token exchange rate-limited', {
+      status: response.status,
+      retryAfter: response.headers.get('retry-after') ?? 'not-provided',
+      rateLimitRemaining: response.headers.get('x-ratelimit-remaining') ?? 'not-provided',
+      rateLimitReset: response.headers.get('x-ratelimit-reset') ?? 'not-provided',
+      githubRequestId: response.headers.get('x-github-request-id') ?? 'not-provided',
+    });
+    return outputError('RATE_LIMITED', env);
   }
 
   /** @type {Record<string, string> | undefined} */
