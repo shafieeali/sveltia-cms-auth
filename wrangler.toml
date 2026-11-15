@@ -1,3 +1,7 @@
 name = "sveltia-cms-auth"
 main = "src/index.js"
 compatibility_date = "2026-11-11"
+keep_vars = true
+
+[vars]
+ALLOWED_DOMAINS = "hexamole-admin-test.pages.dev,hexamole.com,www.hexamole.com"
